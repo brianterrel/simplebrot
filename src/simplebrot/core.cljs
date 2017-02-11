@@ -11,34 +11,12 @@
                           :scale 125
                           :center [250 250]}))
 
-(defn complex-add [x y]
-  "Adds two complex numbers, in the form [a b] = a + bi. If one
-   or more of the arguments are numbers, I assume the imaginary
-   part is zero (this is all I need for my purposes here)"
-  (cond
-    (and (number? x) (number? y)) (+ x y)
-    (number? x) (complex-add [x 0] y)
-    (number? y) (complex-add x [y 0])
-    :else (vector (+ (first x) (first y))
-                  (+ (second x) (second y)))))
-
-(defn complex-multiply [x y]
-  "Multiply two complex numbers, in the form [a b] = a + bi"
-  (vector (-
-            (* (first x) (first y))
-            (* (second x) (second y)))
-          (+
-            (* (first x) (second y)) (* (second x) (first y)))))
-
-(defn square [x] (* x x))
-
-(defn magnitude
-  "Returns the Euclidean distance between two points"
-  [point-1 point-2]
-  (let [[x1 y1] point-1
-        [x2 y2] point-2]
-    (Math/sqrt (+ (square (- x1 x2))
-                  (square (- y1 y2))))))
+(defn square-magnitude
+  "Returns the square of Euclidean distance between two points"
+  [x1 y1 x2 y2]
+  ()
+  (+ (* (- x1 x2) (- x1 x2))
+     (* (- y1 y2) (- y1 y2))))
 
 (defn draw-pixel! [point value context]
   (let [[x y] point]
@@ -53,13 +31,17 @@
     [a b]))
 
 (defn brot-val [pixel]
-  (let [c (pixel-to-point pixel (:center @app-state) (:scale @app-state))]
+  (let [[c-real c-i] (pixel-to-point pixel (:center @app-state) (:scale @app-state))]
     (loop [count 50
-           z [0 0]]
+           z-real 0
+           z-i 0]
       (cond
-        (= 0 count) 0
-        (> (magnitude z [0 0]) 2) (* count 5)
-        :else (recur (dec count) (complex-add (complex-multiply z z) c))))))
+        (identical? 0 count) 0
+        (> (square-magnitude z-real z-i 0 0) 4) (* count 5)
+        :else (recur
+                (dec count)
+                (+ c-real (- (* z-real z-real) (* z-i z-i)))
+                (+ c-i (* 2 z-real z-i)))))))
 
 
 (defn draw-from-list!
@@ -98,10 +80,12 @@
     [a b]))
 
 (defn render-canvas [event state]
+  (.profile js/console "rendering canvas")
   (let [context (. (. js/document (getElementById "main-canvas")) (getContext "2d"))
         x (:scale @state)]
-    ;(draw-from-list! (for [x (range 500) y (range 500)] [x y]) context)))
-    (draw-from-list! (filter #(lattice-point? % 5)(for [x (range 500) y (range 500)] [x y])) context)))
+    (draw-from-list! (for [x (range 500) y (range 500)] [x y]) context))
+    ;(draw-from-list! (filter #(lattice-point? % 5)(for [x (range 500) y (range 500)] [x y])) context))
+  (.profileEnd js/console))
 
 (defn render-canvas-handler [event]
   (render-canvas event app-state))
