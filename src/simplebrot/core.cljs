@@ -8,36 +8,40 @@
 ;; define your app data so that it doesn't get over-written on reload
 
 (defonce app-state (atom {:text "Simplebrot"
-                          :scale 125
-                          :center [250 250]}))
+                          :center [0 0]
+                          :frame-size 2.0
+                          :canvas-size 500
+                          :scale 125}))
+
+(defn absolute [x]
+  (if (> x 0) x (* -1 x)))
 
 (defn square-magnitude
   "Returns the square of Euclidean distance between two points"
   [x1 y1 x2 y2]
-  ()
   (+ (* (- x1 x2) (- x1 x2))
      (* (- y1 y2) (- y1 y2))))
 
 (defn draw-pixel! [point value context]
   (let [[x y] point]
     (set! (.-fillStyle context) (str "rgb(" value "," value "," value ")"))
-    (. context (fillRect x y 5 5))))
+    (. context (fillRect x y 1 1))))
 
 (defn pixel-to-point [pixel center scale]
   (let [[x y] pixel
         [cx cy] center
-        a (/ (- x cx) scale)
-        b (/ (- cy y) scale)]
+        a (+ cx (/ (- x 250) scale))
+        b (+ cy (/ (- 250 y) scale))]
     [a b]))
 
 (defn brot-val [pixel]
   (let [[c-real c-i] (pixel-to-point pixel (:center @app-state) (:scale @app-state))]
-    (loop [count 50
+    (loop [count 255
            z-real 0
            z-i 0]
       (cond
         (identical? 0 count) 0
-        (> (square-magnitude z-real z-i 0 0) 4) (* count 5)
+        (> (square-magnitude z-real z-i 0 0) 4) (+ 128 (* -1 (absolute (- count 128))))
         :else (recur
                 (dec count)
                 (+ c-real (- (* z-real z-real) (* z-i z-i)))
@@ -72,12 +76,6 @@
         y (- y-position y-offset)]
     [x y]))
 
-(defn center-from-coords [coords]
-  (let [[x y] coords
-        [cx cy] (:center @app-state)
-        a (+ cx (- 250 x))
-        b (- cx (- y 250))]
-    [a b]))
 
 (defn render-canvas [event state]
   (.profile js/console "rendering canvas")
@@ -90,17 +88,27 @@
 (defn render-canvas-handler [event]
   (render-canvas event app-state))
 
-(defn zoom-in-handler [event]
-  (swap! app-state assoc-in [:scale] (* 2 (:scale @app-state)))
+(defn zoom-out-handler [event]
+  (swap! app-state assoc-in [:frame-size] (* 4 (:frame-size @app-state)))
+  (swap! app-state assoc-in [:scale] (quot
+                                       250
+                                       (:frame-size @app-state)))
   (render-canvas-handler event))
 
-(defn zoom-out-handler [event]
-  (swap! app-state assoc-in [:scale] (quot (:scale @app-state) 2))
+(defn zoom-in-handler [event]
+  (swap! app-state assoc-in [:frame-size] (/ (:frame-size @app-state) 4))
+  (swap! app-state assoc-in [:scale] (quot
+                                       250
+                                       (:frame-size @app-state)))
   (render-canvas-handler event))
 
 (defn canvas-click-handler [event]
-  (swap! app-state assoc-in [:center] (center-from-coords (coords-from-event event)))
-  (render-canvas-handler event))
+  (swap! app-state assoc-in [:center] (pixel-to-point
+                                        (coords-from-event event)
+                                        (:center @app-state)
+                                        (:scale @app-state)))
+
+  (zoom-in-handler event))
 
 (defn simplebrot []
   [:center
